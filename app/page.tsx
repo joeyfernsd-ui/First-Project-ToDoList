@@ -9,6 +9,7 @@ type Task = {
   id: string;
   title: string;
   dueDate: string;
+  dueTime: string;
   priority: Priority;
   completed: boolean;
   createdAt: number;
@@ -20,7 +21,10 @@ function readTasks(): Task[] {
   if (typeof window === "undefined") return [];
   try {
     const saved = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "[]");
-    return Array.isArray(saved) ? saved : [];
+    if (!Array.isArray(saved)) return [];
+    return saved
+      .filter((task): task is Task => Boolean(task) && typeof task === "object")
+      .map((task) => ({ ...task, dueTime: typeof task.dueTime === "string" ? task.dueTime : "" }));
   } catch {
     return [];
   }
@@ -41,11 +45,13 @@ export default function Home() {
   const [ready, setReady] = useState(false);
   const [title, setTitle] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [dueTime, setDueTime] = useState("");
   const [priority, setPriority] = useState<Priority>("Medium");
   const [filter, setFilter] = useState<Filter>("All");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDueDate, setEditDueDate] = useState("");
+  const [editDueTime, setEditDueTime] = useState("");
   const [editPriority, setEditPriority] = useState<Priority>("Medium");
   const [error, setError] = useState("");
 
@@ -80,6 +86,7 @@ export default function Home() {
         id: crypto.randomUUID(),
         title: cleanTitle,
         dueDate,
+        dueTime: dueDate ? dueTime : "",
         priority,
         completed: false,
         createdAt: Date.now(),
@@ -87,6 +94,7 @@ export default function Home() {
     ]);
     setTitle("");
     setDueDate("");
+    setDueTime("");
     setPriority("Medium");
     setError("");
   }
@@ -95,6 +103,7 @@ export default function Home() {
     setEditingId(task.id);
     setEditTitle(task.title);
     setEditDueDate(task.dueDate);
+    setEditDueTime(task.dueTime ?? "");
     setEditPriority(task.priority);
   }
 
@@ -103,7 +112,13 @@ export default function Home() {
     if (!cleanTitle) return;
     setTasks((current) => current.map((task) => (
       task.id === taskId
-        ? { ...task, title: cleanTitle, dueDate: editDueDate, priority: editPriority }
+        ? {
+            ...task,
+            title: cleanTitle,
+            dueDate: editDueDate,
+            dueTime: editDueDate ? editDueTime : "",
+            priority: editPriority,
+          }
         : task
     )));
     setEditingId(null);
@@ -140,7 +155,27 @@ export default function Home() {
           </div>
           <div className="field">
             <label htmlFor="due-date">Due date <span>(optional)</span></label>
-            <input id="due-date" type="date" value={dueDate} onInput={(event) => setDueDate(event.currentTarget.value)} />
+            <input
+              id="due-date"
+              type="date"
+              value={dueDate}
+              onInput={(event) => {
+                setDueDate(event.currentTarget.value);
+                if (!event.currentTarget.value) setDueTime("");
+              }}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="due-time">Due time <span>(24-hour)</span></label>
+            <input
+              id="due-time"
+              type="time"
+              lang="en-GB"
+              step="60"
+              value={dueTime}
+              disabled={!dueDate}
+              onInput={(event) => setDueTime(event.currentTarget.value)}
+            />
           </div>
           <div className="field">
             <label htmlFor="priority">Priority</label>
@@ -202,7 +237,27 @@ export default function Home() {
                       </div>
                       <div className="edit-field edit-date-field">
                         <label htmlFor={`edit-date-${task.id}`}>Due date (optional)</label>
-                        <input id={`edit-date-${task.id}`} type="date" value={editDueDate} onInput={(event) => setEditDueDate(event.currentTarget.value)} />
+                        <input
+                          id={`edit-date-${task.id}`}
+                          type="date"
+                          value={editDueDate}
+                          onInput={(event) => {
+                            setEditDueDate(event.currentTarget.value);
+                            if (!event.currentTarget.value) setEditDueTime("");
+                          }}
+                        />
+                      </div>
+                      <div className="edit-field edit-time-field">
+                        <label htmlFor={`edit-time-${task.id}`}>Due time (24-hour)</label>
+                        <input
+                          id={`edit-time-${task.id}`}
+                          type="time"
+                          lang="en-GB"
+                          step="60"
+                          value={editDueTime}
+                          disabled={!editDueDate}
+                          onInput={(event) => setEditDueTime(event.currentTarget.value)}
+                        />
                       </div>
                       <div className="edit-field edit-priority-field">
                         <label htmlFor={`edit-priority-${task.id}`}>Priority</label>
@@ -226,7 +281,11 @@ export default function Home() {
                       <h3>{task.title}</h3>
                       <div className="task-meta">
                         <span className={`priority ${task.priority.toLowerCase()}`}>{task.priority}</span>
-                        <span>{task.dueDate ? `Due ${formatDueDate(task.dueDate)}` : "No due date"}</span>
+                        <span>
+                          {task.dueDate
+                            ? `Due ${formatDueDate(task.dueDate)}${task.dueTime ? ` at ${task.dueTime}` : ""}`
+                            : "No due date"}
+                        </span>
                       </div>
                     </>
                   )}
@@ -242,7 +301,7 @@ export default function Home() {
           </ul>
         )}
       </section>
-      <footer>Saved on this device | No account needed</footer>
+      <footer>TaskBoard v0.2.0 | Saved on this device | No account needed</footer>
     </main>
   );
 }
