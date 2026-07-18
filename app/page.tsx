@@ -142,7 +142,7 @@ export default function Home() {
               <option>High</option>
             </select>
           </div>
-          <button className="add-button" type="submit"><span aria-hidden="true">ï¼‹</span> Add task</button>
+          <button className="add-button" type="submit"><span aria-hidden="true">+</span> Add task</button>
         </form>
 
         <div className="toolbar">
@@ -166,10 +166,10 @@ export default function Home() {
         </div>
 
         {!ready ? (
-          <div className="empty-state" role="status">Loading your tasksâ€¦</div>
+          <div className="empty-state" role="status">Loading your tasks...</div>
         ) : visibleTasks.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-icon" aria-hidden="true">âœ“</div>
+            <div className="empty-icon" aria-hidden="true">[ ]</div>
             <h3>{filter === "All" ? "No tasks yet" : `No ${filter.toLowerCase()} tasks`}</h3>
             <p>{filter === "All" ? "Add a task to get your board moving." : "Try another filter to see your tasks."}</p>
           </div>
@@ -183,7 +183,7 @@ export default function Home() {
                   aria-label={`Mark ${task.title} as ${task.completed ? "pending" : "completed"}`}
                   onClick={() => setTasks((current) => current.map((item) => item.id === task.id ? { ...item, completed: !item.completed } : item))}
                 >
-                  {task.completed && <span aria-hidden="true">âœ“</span>}
+                  {task.completed && <span aria-hidden="true">X</span>}
                 </button>
                 <div className="task-content">
                   {editingId === task.id ? (
@@ -214,7 +214,7 @@ export default function Home() {
           </ul>
         )}
       </section>
-      <footer>Saved on this device Â· No account needed</footer>
+      <footer>Saved on this device | No account needed</footer>
     </main>
   );
 }

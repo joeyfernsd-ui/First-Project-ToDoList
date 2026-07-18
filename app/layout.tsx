@@ -5,7 +5,7 @@ const productionHost = process.env.VERCEL_PROJECT_PRODUCTION_URL;
 
 export const metadata: Metadata = {
   metadataBase: new URL(productionHost ? `https://${productionHost}` : "http://localhost:3000"),
-  title: "TaskBoard â€” Simple task planning",
+  title: "TaskBoard - Simple task planning",
   description: "A simple, private to-do list that keeps your tasks on this device.",
   icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
   openGraph: {
