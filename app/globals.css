@@ -142,8 +142,11 @@ input[aria-invalid="true"] { border-color: #c9362b; }
 .task-actions { display: flex; gap: 6px; }
 .task-actions button, .edit-form button { border: 1px solid var(--line); border-radius: 9px; background: white; color: #475467; padding: 7px 10px; font-size: 12px; font-weight: 700; }
 .task-actions .delete { color: #b42318; }
-.edit-form { display: flex; align-items: center; gap: 7px; }
+.edit-form { display: grid; grid-template-columns: minmax(180px, 1fr) 165px auto; align-items: end; gap: 9px; }
+.edit-field { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
+.edit-field label { color: var(--muted); font-size: 11px; font-weight: 700; }
 .edit-form input { min-height: 38px; }
+.edit-actions { display: flex; gap: 6px; padding-bottom: 1px; }
 .edit-form button:disabled { cursor: not-allowed; opacity: .45; }
 
 .empty-state { padding: 55px 20px; border: 1px dashed #cbd1da; border-radius: 18px; color: var(--muted); text-align: center; }
@@ -173,8 +176,8 @@ footer { margin-top: 34px; color: #89919d; font-size: 12px; text-align: center; 
   .filters { display: grid; grid-template-columns: repeat(3, 1fr); }
   .task-card { grid-template-columns: auto minmax(0,1fr); align-items: start; padding: 15px; }
   .task-actions { grid-column: 2; }
-  .edit-form { align-items: stretch; flex-wrap: wrap; }
-  .edit-form input { flex-basis: 100%; }
+  .edit-form { grid-template-columns: 1fr; align-items: stretch; }
+  .edit-actions { padding-bottom: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }

@@ -45,6 +45,7 @@ export default function Home() {
   const [filter, setFilter] = useState<Filter>("All");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
+  const [editDueDate, setEditDueDate] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -92,12 +93,15 @@ export default function Home() {
   function startEditing(task: Task) {
     setEditingId(task.id);
     setEditTitle(task.title);
+    setEditDueDate(task.dueDate);
   }
 
   function saveEdit(taskId: string) {
     const cleanTitle = editTitle.trim();
     if (!cleanTitle) return;
-    setTasks((current) => current.map((task) => (task.id === taskId ? { ...task, title: cleanTitle } : task)));
+    setTasks((current) => current.map((task) => (
+      task.id === taskId ? { ...task, title: cleanTitle, dueDate: editDueDate } : task
+    )));
     setEditingId(null);
   }
 
@@ -188,10 +192,18 @@ export default function Home() {
                 <div className="task-content">
                   {editingId === task.id ? (
                     <form className="edit-form" onSubmit={(event) => { event.preventDefault(); saveEdit(task.id); }}>
-                      <label className="sr-only" htmlFor={`edit-${task.id}`}>Edit task</label>
-                      <input id={`edit-${task.id}`} autoFocus value={editTitle} onChange={(event) => setEditTitle(event.target.value)} />
-                      <button type="submit" disabled={!editTitle.trim()}>Save</button>
-                      <button type="button" onClick={() => setEditingId(null)}>Cancel</button>
+                      <div className="edit-field edit-title-field">
+                        <label htmlFor={`edit-${task.id}`}>Task</label>
+                        <input id={`edit-${task.id}`} autoFocus value={editTitle} onChange={(event) => setEditTitle(event.target.value)} />
+                      </div>
+                      <div className="edit-field edit-date-field">
+                        <label htmlFor={`edit-date-${task.id}`}>Due date (optional)</label>
+                        <input id={`edit-date-${task.id}`} type="date" value={editDueDate} onInput={(event) => setEditDueDate(event.currentTarget.value)} />
+                      </div>
+                      <div className="edit-actions">
+                        <button type="submit" disabled={!editTitle.trim()}>Save</button>
+                        <button type="button" onClick={() => setEditingId(null)}>Cancel</button>
+                      </div>
                     </form>
                   ) : (
                     <>
