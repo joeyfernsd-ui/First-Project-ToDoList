@@ -46,6 +46,7 @@ export default function Home() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDueDate, setEditDueDate] = useState("");
+  const [editPriority, setEditPriority] = useState<Priority>("Medium");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -94,13 +95,16 @@ export default function Home() {
     setEditingId(task.id);
     setEditTitle(task.title);
     setEditDueDate(task.dueDate);
+    setEditPriority(task.priority);
   }
 
   function saveEdit(taskId: string) {
     const cleanTitle = editTitle.trim();
     if (!cleanTitle) return;
     setTasks((current) => current.map((task) => (
-      task.id === taskId ? { ...task, title: cleanTitle, dueDate: editDueDate } : task
+      task.id === taskId
+        ? { ...task, title: cleanTitle, dueDate: editDueDate, priority: editPriority }
+        : task
     )));
     setEditingId(null);
   }
@@ -199,6 +203,18 @@ export default function Home() {
                       <div className="edit-field edit-date-field">
                         <label htmlFor={`edit-date-${task.id}`}>Due date (optional)</label>
                         <input id={`edit-date-${task.id}`} type="date" value={editDueDate} onInput={(event) => setEditDueDate(event.currentTarget.value)} />
+                      </div>
+                      <div className="edit-field edit-priority-field">
+                        <label htmlFor={`edit-priority-${task.id}`}>Priority</label>
+                        <select
+                          id={`edit-priority-${task.id}`}
+                          value={editPriority}
+                          onChange={(event) => setEditPriority(event.target.value as Priority)}
+                        >
+                          <option>Low</option>
+                          <option>Medium</option>
+                          <option>High</option>
+                        </select>
                       </div>
                       <div className="edit-actions">
                         <button type="submit" disabled={!editTitle.trim()}>Save</button>

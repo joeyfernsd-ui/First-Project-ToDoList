@@ -142,10 +142,10 @@ input[aria-invalid="true"] { border-color: #c9362b; }
 .task-actions { display: flex; gap: 6px; }
 .task-actions button, .edit-form button { border: 1px solid var(--line); border-radius: 9px; background: white; color: #475467; padding: 7px 10px; font-size: 12px; font-weight: 700; }
 .task-actions .delete { color: #b42318; }
-.edit-form { display: grid; grid-template-columns: minmax(180px, 1fr) 165px auto; align-items: end; gap: 9px; }
+.edit-form { display: grid; grid-template-columns: minmax(180px, 1fr) 155px 115px auto; align-items: end; gap: 9px; }
 .edit-field { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
 .edit-field label { color: var(--muted); font-size: 11px; font-weight: 700; }
-.edit-form input { min-height: 38px; }
+.edit-form input, .edit-form select { min-height: 38px; }
 .edit-actions { display: flex; gap: 6px; padding-bottom: 1px; }
 .edit-form button:disabled { cursor: not-allowed; opacity: .45; }
 
