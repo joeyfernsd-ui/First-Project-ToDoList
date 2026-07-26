@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 
 type Priority = "Low" | "Medium" | "High";
 type Filter = "All" | "Pending" | "Completed";
@@ -128,10 +129,17 @@ export default function Home() {
     <main className="page-shell">
       <section className="taskboard" aria-labelledby="page-title">
         <header className="hero">
-          <div className="brand-mark" aria-hidden="true">TB</div>
-          <div>
+          <div className="brand-area">
+            <Image
+              className="brand-logo"
+              src="/taskboard-logo.png"
+              alt="TaskBoard"
+              width={1730}
+              height={480}
+              priority
+            />
+            <h1 className="sr-only" id="page-title">TaskBoard</h1>
             <p className="eyebrow">Your work, clearly organised</p>
-            <h1 id="page-title">TaskBoard</h1>
             <p className="subtitle">A simple place to plan what matters and finish it.</p>
           </div>
           <div className="count-card" aria-label={`${pendingCount} pending tasks`}>
