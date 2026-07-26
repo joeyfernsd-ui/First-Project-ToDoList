@@ -225,88 +225,99 @@ export default function Home() {
             <p>{filter === "All" ? "Add a task to get your board moving." : "Try another filter to see your tasks."}</p>
           </div>
         ) : (
-          <ul className="task-list" aria-label={`${filter} tasks`}>
-            {visibleTasks.map((task) => (
-              <li className={`task-card ${task.completed ? "completed" : ""}`} key={task.id}>
-                <button
-                  type="button"
-                  className="status-button"
-                  aria-label={`Mark ${task.title} as ${task.completed ? "pending" : "completed"}`}
-                  onClick={() => setTasks((current) => current.map((item) => item.id === task.id ? { ...item, completed: !item.completed } : item))}
-                >
-                  {task.completed && <span aria-hidden="true">X</span>}
-                </button>
-                <div className="task-content">
+          <>
+            <div className="task-table-head" aria-hidden="true">
+              <span />
+              <span>Task</span>
+              <span>Priority</span>
+              <span>Due date</span>
+              <span>Time</span>
+              <span>Actions</span>
+            </div>
+            <ul className="task-list" aria-label={`${filter} tasks`}>
+              {visibleTasks.map((task) => (
+                <li className={`task-card ${task.completed ? "completed" : ""}`} key={task.id}>
+                  <button
+                    type="button"
+                    className="status-button"
+                    aria-label={`Mark ${task.title} as ${task.completed ? "pending" : "completed"}`}
+                    onClick={() => setTasks((current) => current.map((item) => item.id === task.id ? { ...item, completed: !item.completed } : item))}
+                  >
+                    {task.completed && <span aria-hidden="true">X</span>}
+                  </button>
                   {editingId === task.id ? (
-                    <form className="edit-form" onSubmit={(event) => { event.preventDefault(); saveEdit(task.id); }}>
-                      <div className="edit-field edit-title-field">
-                        <label htmlFor={`edit-${task.id}`}>Task</label>
-                        <input id={`edit-${task.id}`} autoFocus value={editTitle} onChange={(event) => setEditTitle(event.target.value)} />
-                      </div>
-                      <div className="edit-field edit-date-field">
-                        <label htmlFor={`edit-date-${task.id}`}>Due date (optional)</label>
-                        <input
-                          id={`edit-date-${task.id}`}
-                          type="date"
-                          value={editDueDate}
-                          onInput={(event) => {
-                            setEditDueDate(event.currentTarget.value);
-                            if (!event.currentTarget.value) setEditDueTime("");
-                          }}
-                        />
-                      </div>
-                      <div className="edit-field edit-time-field">
-                        <label htmlFor={`edit-time-${task.id}`}>Due time (24-hour)</label>
-                        <input
-                          id={`edit-time-${task.id}`}
-                          type="time"
-                          lang="en-GB"
-                          step="60"
-                          value={editDueTime}
-                          disabled={!editDueDate}
-                          onInput={(event) => setEditDueTime(event.currentTarget.value)}
-                        />
-                      </div>
-                      <div className="edit-field edit-priority-field">
-                        <label htmlFor={`edit-priority-${task.id}`}>Priority</label>
-                        <select
-                          id={`edit-priority-${task.id}`}
-                          value={editPriority}
-                          onChange={(event) => setEditPriority(event.target.value as Priority)}
-                        >
-                          <option>Low</option>
-                          <option>Medium</option>
-                          <option>High</option>
-                        </select>
-                      </div>
-                      <div className="edit-actions">
-                        <button type="submit" disabled={!editTitle.trim()}>Save</button>
-                        <button type="button" onClick={() => setEditingId(null)}>Cancel</button>
-                      </div>
-                    </form>
+                    <div className="task-edit-cell">
+                      <form className="edit-form" onSubmit={(event) => { event.preventDefault(); saveEdit(task.id); }}>
+                        <div className="edit-field edit-title-field">
+                          <label htmlFor={`edit-${task.id}`}>Task</label>
+                          <input id={`edit-${task.id}`} autoFocus value={editTitle} onChange={(event) => setEditTitle(event.target.value)} />
+                        </div>
+                        <div className="edit-field edit-date-field">
+                          <label htmlFor={`edit-date-${task.id}`}>Due date (optional)</label>
+                          <input
+                            id={`edit-date-${task.id}`}
+                            type="date"
+                            value={editDueDate}
+                            onInput={(event) => {
+                              setEditDueDate(event.currentTarget.value);
+                              if (!event.currentTarget.value) setEditDueTime("");
+                            }}
+                          />
+                        </div>
+                        <div className="edit-field edit-time-field">
+                          <label htmlFor={`edit-time-${task.id}`}>Due time (24-hour)</label>
+                          <input
+                            id={`edit-time-${task.id}`}
+                            type="time"
+                            lang="en-GB"
+                            step="60"
+                            value={editDueTime}
+                            disabled={!editDueDate}
+                            onInput={(event) => setEditDueTime(event.currentTarget.value)}
+                          />
+                        </div>
+                        <div className="edit-field edit-priority-field">
+                          <label htmlFor={`edit-priority-${task.id}`}>Priority</label>
+                          <select
+                            id={`edit-priority-${task.id}`}
+                            value={editPriority}
+                            onChange={(event) => setEditPriority(event.target.value as Priority)}
+                          >
+                            <option>Low</option>
+                            <option>Medium</option>
+                            <option>High</option>
+                          </select>
+                        </div>
+                        <div className="edit-actions">
+                          <button type="submit" disabled={!editTitle.trim()}>Save</button>
+                          <button type="button" onClick={() => setEditingId(null)}>Cancel</button>
+                        </div>
+                      </form>
+                    </div>
                   ) : (
                     <>
-                      <h3>{task.title}</h3>
-                      <div className="task-meta">
+                      <div className="task-data task-title-cell" data-label="Task">
+                        <h3>{task.title}</h3>
+                      </div>
+                      <div className="task-data task-priority-cell" data-label="Priority">
                         <span className={`priority ${task.priority.toLowerCase()}`}>{task.priority}</span>
-                        <span>
-                          {task.dueDate
-                            ? `Due ${formatDueDate(task.dueDate)}${task.dueTime ? ` at ${task.dueTime}` : ""}`
-                            : "No due date"}
-                        </span>
+                      </div>
+                      <div className="task-data task-date-cell" data-label="Due date">
+                        <span>{task.dueDate ? formatDueDate(task.dueDate) : "No date"}</span>
+                      </div>
+                      <div className="task-data task-time-cell" data-label="Time">
+                        <span>{task.dueDate && task.dueTime ? task.dueTime : "--:--"}</span>
+                      </div>
+                      <div className="task-actions">
+                        <button type="button" onClick={() => startEditing(task)} aria-label={`Edit ${task.title}`}>Edit</button>
+                        <button className="delete" type="button" onClick={() => setTasks((current) => current.filter((item) => item.id !== task.id))} aria-label={`Delete ${task.title}`}>Delete</button>
                       </div>
                     </>
                   )}
-                </div>
-                {editingId !== task.id && (
-                  <div className="task-actions">
-                    <button type="button" onClick={() => startEditing(task)} aria-label={`Edit ${task.title}`}>Edit</button>
-                    <button className="delete" type="button" onClick={() => setTasks((current) => current.filter((item) => item.id !== task.id))} aria-label={`Delete ${task.title}`}>Delete</button>
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
+                </li>
+              ))}
+            </ul>
+          </>
         )}
       </section>
       <footer>TaskBoard v0.2.0 | Saved on this device | No account needed</footer>
