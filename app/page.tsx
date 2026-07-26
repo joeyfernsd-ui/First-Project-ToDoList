@@ -320,7 +320,7 @@ export default function Home() {
           </>
         )}
       </section>
-      <footer>TaskBoard v0.2.3 | Saved on this device | No account needed</footer>
+      <footer>TaskBoard v0.2.4 | Saved on this device | No account needed</footer>
     </main>
   );
 }
