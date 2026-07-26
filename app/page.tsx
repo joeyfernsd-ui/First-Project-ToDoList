@@ -167,10 +167,7 @@ export default function Home() {
               id="due-date"
               type="date"
               value={dueDate}
-              onInput={(event) => {
-                setDueDate(event.currentTarget.value);
-                if (!event.currentTarget.value) setDueTime("");
-              }}
+              onInput={(event) => setDueDate(event.currentTarget.value)}
             />
           </div>
           <div className="field">
@@ -181,7 +178,6 @@ export default function Home() {
               lang="en-GB"
               step="60"
               value={dueTime}
-              disabled={!dueDate}
               onInput={(event) => setDueTime(event.currentTarget.value)}
             />
           </div>
@@ -320,7 +316,7 @@ export default function Home() {
           </>
         )}
       </section>
-      <footer>TaskBoard v0.2.4 | Saved on this device | No account needed</footer>
+      <footer>TaskBoard v0.2.5 | Saved on this device | No account needed</footer>
     </main>
   );
 }
