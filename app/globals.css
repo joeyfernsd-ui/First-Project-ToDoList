@@ -103,7 +103,7 @@ input:disabled { cursor: not-allowed; opacity: .55; }
 
 /* Shared desktop columns keep task details compact and evenly spaced. */
 .task-table-head, .task-card {
-  grid-template-columns: 28px minmax(260px, 340px) repeat(3, 112px) minmax(118px, 1fr);
+  grid-template-columns: 28px minmax(220px, 240px) repeat(3, 112px) minmax(118px, 1fr);
   column-gap: 14px;
 }
 .task-table-head {
