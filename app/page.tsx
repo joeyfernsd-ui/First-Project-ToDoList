@@ -1,7 +1,8 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
+import { getDueReminderIds, getReminderTime, markRemindersNotified } from "./reminders";
 
 type Priority = "Low" | "Medium" | "High";
 type Filter = "All" | "Pending" | "Completed";
@@ -11,12 +12,22 @@ type Task = {
   title: string;
   dueDate: string;
   dueTime: string;
+  reminderAt: number | null;
+  notifiedAt: number | null;
   priority: Priority;
   completed: boolean;
   createdAt: number;
 };
 
 const STORAGE_KEY = "taskboard.tasks.v1";
+const REMINDER_CHECK_INTERVAL_MS = 30_000;
+
+type ReminderPermission = NotificationPermission | "unsupported";
+
+function getReminderPermission(): ReminderPermission {
+  if (typeof window === "undefined" || !("Notification" in window)) return "unsupported";
+  return window.Notification.permission;
+}
 
 function readTasks(): Task[] {
   if (typeof window === "undefined") return [];
@@ -25,7 +36,19 @@ function readTasks(): Task[] {
     if (!Array.isArray(saved)) return [];
     return saved
       .filter((task): task is Task => Boolean(task) && typeof task === "object")
-      .map((task) => ({ ...task, dueTime: typeof task.dueTime === "string" ? task.dueTime : "" }));
+      .map((task) => {
+        const savedDueDate = typeof task.dueDate === "string" ? task.dueDate : "";
+        const savedDueTime = typeof task.dueTime === "string" ? task.dueTime : "";
+        return {
+          ...task,
+          dueDate: savedDueDate,
+          dueTime: savedDueTime,
+          reminderAt: typeof task.reminderAt === "number"
+            ? task.reminderAt
+            : getReminderTime(savedDueDate, savedDueTime),
+          notifiedAt: typeof task.notifiedAt === "number" ? task.notifiedAt : null,
+        };
+      });
   } catch {
     return [];
   }
@@ -43,6 +66,7 @@ function formatDueDate(value: string) {
 
 export default function Home() {
   const [tasks, setTasks] = useState<Task[]>([]);
+  const tasksRef = useRef<Task[]>([]);
   const [ready, setReady] = useState(false);
   const [title, setTitle] = useState("");
   const [dueDate, setDueDate] = useState("");
@@ -55,15 +79,79 @@ export default function Home() {
   const [editDueTime, setEditDueTime] = useState("");
   const [editPriority, setEditPriority] = useState<Priority>("Medium");
   const [error, setError] = useState("");
+  const [notificationPermission, setNotificationPermission] = useState<ReminderPermission>("default");
 
   useEffect(() => {
-    setTasks(readTasks());
-    setReady(true);
+    const savedTasks = readTasks();
+    tasksRef.current = savedTasks;
+    const hydrationId = window.setTimeout(() => {
+      setTasks(savedTasks);
+      setNotificationPermission(getReminderPermission());
+      setReady(true);
+    }, 0);
+    return () => window.clearTimeout(hydrationId);
   }, []);
+
+  useEffect(() => {
+    tasksRef.current = tasks;
+  }, [tasks]);
 
   useEffect(() => {
     if (ready) window.localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
   }, [tasks, ready]);
+
+  const checkDueReminders = useCallback(() => {
+    if (getReminderPermission() !== "granted") return;
+
+    const now = Date.now();
+    const dueReminderIds = getDueReminderIds(tasksRef.current, now);
+    const notifiedIds = new Set<string>();
+
+    tasksRef.current.forEach((task) => {
+      if (!dueReminderIds.has(task.id)) return;
+
+      try {
+        new window.Notification("TaskBoard reminder", {
+          body: `${task.title} is due now (${task.dueTime}).`,
+          icon: "/taskboard-logo.png",
+          tag: `taskboard-reminder-${task.id}`,
+        });
+        notifiedIds.add(task.id);
+      } catch {
+        // Leave the reminder pending so it can be retried when the page becomes active.
+      }
+    });
+
+    if (notifiedIds.size === 0) return;
+
+    tasksRef.current = markRemindersNotified(tasksRef.current, notifiedIds, now);
+    setTasks((current) => markRemindersNotified(current, notifiedIds, now));
+  }, []);
+
+  useEffect(() => {
+    if (!ready) return;
+
+    const checkWhenActive = () => {
+      setNotificationPermission(getReminderPermission());
+      checkDueReminders();
+    };
+    const checkWhenVisible = () => {
+      if (document.visibilityState === "visible") checkWhenActive();
+    };
+
+    checkWhenActive();
+    const intervalId = window.setInterval(checkDueReminders, REMINDER_CHECK_INTERVAL_MS);
+    document.addEventListener("visibilitychange", checkWhenVisible);
+    window.addEventListener("focus", checkWhenActive);
+    window.addEventListener("pageshow", checkWhenActive);
+
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", checkWhenVisible);
+      window.removeEventListener("focus", checkWhenActive);
+      window.removeEventListener("pageshow", checkWhenActive);
+    };
+  }, [checkDueReminders, ready]);
 
   const pendingCount = tasks.filter((task) => !task.completed).length;
   const visibleTasks = useMemo(
@@ -88,6 +176,8 @@ export default function Home() {
         title: cleanTitle,
         dueDate,
         dueTime: dueDate ? dueTime : "",
+        reminderAt: getReminderTime(dueDate, dueTime),
+        notifiedAt: null,
         priority,
         completed: false,
         createdAt: Date.now(),
@@ -113,17 +203,41 @@ export default function Home() {
     if (!cleanTitle) return;
     setTasks((current) => current.map((task) => (
       task.id === taskId
-        ? {
-            ...task,
-            title: cleanTitle,
-            dueDate: editDueDate,
-            dueTime: editDueDate ? editDueTime : "",
-            priority: editPriority,
-          }
+        ? (() => {
+            const reminderAt = getReminderTime(editDueDate, editDueTime);
+            return {
+              ...task,
+              title: cleanTitle,
+              dueDate: editDueDate,
+              dueTime: editDueDate ? editDueTime : "",
+              reminderAt,
+              notifiedAt: reminderAt === task.reminderAt ? task.notifiedAt : null,
+              priority: editPriority,
+            };
+          })()
         : task
     )));
     setEditingId(null);
   }
+
+  async function enableReminders() {
+    if (!("Notification" in window)) {
+      setNotificationPermission("unsupported");
+      return;
+    }
+
+    const permission = await window.Notification.requestPermission();
+    setNotificationPermission(permission);
+    if (permission === "granted") checkDueReminders();
+  }
+
+  const reminderButtonText = notificationPermission === "granted"
+    ? "Reminders enabled"
+    : notificationPermission === "denied"
+      ? "Notifications blocked"
+      : notificationPermission === "unsupported"
+        ? "Notifications unavailable"
+        : "Enable reminders";
 
   return (
     <main className="page-shell">
@@ -197,18 +311,29 @@ export default function Home() {
             <h2>My tasks</h2>
             <p>{tasks.length === 0 ? "Add your first task above." : `${tasks.length} task${tasks.length === 1 ? "" : "s"} in total`}</p>
           </div>
-          <div className="filters" aria-label="Filter tasks">
-            {(["All", "Pending", "Completed"] as Filter[]).map((option) => (
-              <button
-                className={filter === option ? "active" : ""}
-                type="button"
-                key={option}
-                aria-pressed={filter === option}
-                onClick={() => setFilter(option)}
-              >
-                {option}
-              </button>
-            ))}
+          <div className="toolbar-actions">
+            <button
+              className={`reminder-button ${notificationPermission === "granted" ? "enabled" : ""}`}
+              type="button"
+              disabled={notificationPermission !== "default"}
+              onClick={enableReminders}
+            >
+              {reminderButtonText}
+            </button>
+            <span className="sr-only" role="status" aria-live="polite">{reminderButtonText}</span>
+            <div className="filters" aria-label="Filter tasks">
+              {(["All", "Pending", "Completed"] as Filter[]).map((option) => (
+                <button
+                  className={filter === option ? "active" : ""}
+                  type="button"
+                  key={option}
+                  aria-pressed={filter === option}
+                  onClick={() => setFilter(option)}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -316,7 +441,7 @@ export default function Home() {
           </>
         )}
       </section>
-      <footer>TaskBoard v0.2.5 | Saved on this device | No account needed</footer>
+      <footer>TaskBoard v0.3.0 | Saved on this device | No account needed</footer>
     </main>
   );
 }
