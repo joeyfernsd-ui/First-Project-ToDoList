@@ -4,6 +4,7 @@ import {
   getDueReminderIds,
   getReminderTime,
   markRemindersNotified,
+  snoozeReminder,
   type ReminderTask,
 } from "../app/reminders.ts";
 
@@ -54,5 +55,22 @@ test("marks delivered reminders so later checks cannot duplicate them", () => {
 
   assert.equal(marked[0].notifiedAt, deliveredAt);
   assert.deepEqual([...getDueReminderIds(marked, deliveredAt + 1)], []);
+});
+
+test("snoozes a delivered reminder for five minutes and makes it pending again", () => {
+  const now = 2_000;
+  const snoozedUntil = now + (5 * 60_000);
+  const tasks: ReminderTask[] = [{
+    id: "snooze-me",
+    completed: false,
+    reminderAt: 1_000,
+    notifiedAt: 1_500,
+  }];
+  const snoozed = snoozeReminder(tasks, "snooze-me", snoozedUntil);
+
+  assert.equal(snoozed[0].reminderAt, snoozedUntil);
+  assert.equal(snoozed[0].notifiedAt, null);
+  assert.deepEqual([...getDueReminderIds(snoozed, snoozedUntil - 1)], []);
+  assert.deepEqual([...getDueReminderIds(snoozed, snoozedUntil)], ["snooze-me"]);
 });
 

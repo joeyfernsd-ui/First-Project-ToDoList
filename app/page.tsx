@@ -2,7 +2,12 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { getDueReminderIds, getReminderTime, markRemindersNotified } from "./reminders";
+import {
+  getDueReminderIds,
+  getReminderTime,
+  markRemindersNotified,
+  snoozeReminder,
+} from "./reminders";
 
 type Priority = "Low" | "Medium" | "High";
 type Filter = "All" | "Pending" | "Completed";
@@ -21,8 +26,12 @@ type Task = {
 
 const STORAGE_KEY = "taskboard.tasks.v1";
 const REMINDER_CHECK_INTERVAL_MS = 30_000;
+const SNOOZE_DURATION_MS = 5 * 60_000;
 
 type ReminderPermission = NotificationPermission | "unsupported";
+type NotificationOptionsWithActions = NotificationOptions & {
+  actions: Array<{ action: string; title: string; icon?: string }>;
+};
 
 function getReminderPermission(): ReminderPermission {
   if (typeof window === "undefined" || !("Notification" in window)) return "unsupported";
@@ -80,9 +89,16 @@ export default function Home() {
   const [editPriority, setEditPriority] = useState<Priority>("Medium");
   const [error, setError] = useState("");
   const [notificationPermission, setNotificationPermission] = useState<ReminderPermission>("default");
+  const checkingRemindersRef = useRef(false);
+  const serviceWorkerRegistrationRef = useRef<Promise<ServiceWorkerRegistration | null> | null>(null);
 
   useEffect(() => {
-    const savedTasks = readTasks();
+    let savedTasks = readTasks();
+    const snoozeTaskId = new URLSearchParams(window.location.search).get("snoozeTask");
+    if (snoozeTaskId) {
+      savedTasks = snoozeReminder(savedTasks, snoozeTaskId, Date.now() + SNOOZE_DURATION_MS);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
     tasksRef.current = savedTasks;
     const hydrationId = window.setTimeout(() => {
       setTasks(savedTasks);
@@ -100,32 +116,80 @@ export default function Home() {
     if (ready) window.localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
   }, [tasks, ready]);
 
-  const checkDueReminders = useCallback(() => {
-    if (getReminderPermission() !== "granted") return;
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+    serviceWorkerRegistrationRef.current = navigator.serviceWorker
+      .register("/taskboard-sw.js")
+      .then(() => navigator.serviceWorker.ready)
+      .catch(() => null);
+  }, []);
 
-    const now = Date.now();
-    const dueReminderIds = getDueReminderIds(tasksRef.current, now);
-    const notifiedIds = new Set<string>();
-
-    tasksRef.current.forEach((task) => {
-      if (!dueReminderIds.has(task.id)) return;
-
-      try {
-        new window.Notification("TaskBoard reminder", {
-          body: `${task.title} is due now (${task.dueTime}).`,
-          icon: "/taskboard-logo.png",
-          tag: `taskboard-reminder-${task.id}`,
-        });
-        notifiedIds.add(task.id);
-      } catch {
-        // Leave the reminder pending so it can be retried when the page becomes active.
-      }
+  const snoozeTaskReminder = useCallback((taskId: string, minutes = 5) => {
+    const snoozedUntil = Date.now() + (minutes * 60_000);
+    setTasks((current) => {
+      const updatedTasks = snoozeReminder(current, taskId, snoozedUntil);
+      tasksRef.current = updatedTasks;
+      return updatedTasks;
     });
+  }, []);
 
-    if (notifiedIds.size === 0) return;
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
 
-    tasksRef.current = markRemindersNotified(tasksRef.current, notifiedIds, now);
-    setTasks((current) => markRemindersNotified(current, notifiedIds, now));
+    const handleServiceWorkerMessage = (event: MessageEvent) => {
+      if (event.data?.type !== "TASKBOARD_SNOOZE" || typeof event.data.taskId !== "string") return;
+      const minutes = typeof event.data.minutes === "number" ? event.data.minutes : 5;
+      snoozeTaskReminder(event.data.taskId, minutes);
+    };
+
+    navigator.serviceWorker.addEventListener("message", handleServiceWorkerMessage);
+    return () => navigator.serviceWorker.removeEventListener("message", handleServiceWorkerMessage);
+  }, [snoozeTaskReminder]);
+
+  const checkDueReminders = useCallback(async () => {
+    if (getReminderPermission() !== "granted" || checkingRemindersRef.current) return;
+
+    checkingRemindersRef.current = true;
+    try {
+      const now = Date.now();
+      const dueReminderIds = getDueReminderIds(tasksRef.current, now);
+      if (dueReminderIds.size === 0) return;
+
+      let serviceWorkerRegistration: ServiceWorkerRegistration | null = null;
+      if (serviceWorkerRegistrationRef.current) {
+        serviceWorkerRegistration = await serviceWorkerRegistrationRef.current;
+      }
+
+      const notifiedIds = new Set<string>();
+      for (const task of tasksRef.current) {
+        if (!dueReminderIds.has(task.id)) continue;
+
+        try {
+          const options: NotificationOptionsWithActions = {
+            body: `${task.title} is due now (${task.dueTime}).`,
+            icon: "/taskboard-logo.png",
+            tag: `taskboard-reminder-${task.id}`,
+            data: { taskId: task.id },
+            actions: [{ action: "snooze-5", title: "Snooze 5 minutes" }],
+          };
+
+          if (serviceWorkerRegistration) {
+            await serviceWorkerRegistration.showNotification("TaskBoard reminder", options);
+          } else {
+            new window.Notification("TaskBoard reminder", options);
+          }
+          notifiedIds.add(task.id);
+        } catch {
+          // Leave the reminder pending so it can be retried when the page becomes active.
+        }
+      }
+
+      if (notifiedIds.size === 0) return;
+      tasksRef.current = markRemindersNotified(tasksRef.current, notifiedIds, now);
+      setTasks((current) => markRemindersNotified(current, notifiedIds, now));
+    } finally {
+      checkingRemindersRef.current = false;
+    }
   }, []);
 
   useEffect(() => {
@@ -133,14 +197,14 @@ export default function Home() {
 
     const checkWhenActive = () => {
       setNotificationPermission(getReminderPermission());
-      checkDueReminders();
+      void checkDueReminders();
     };
     const checkWhenVisible = () => {
       if (document.visibilityState === "visible") checkWhenActive();
     };
 
     checkWhenActive();
-    const intervalId = window.setInterval(checkDueReminders, REMINDER_CHECK_INTERVAL_MS);
+    const intervalId = window.setInterval(() => void checkDueReminders(), REMINDER_CHECK_INTERVAL_MS);
     document.addEventListener("visibilitychange", checkWhenVisible);
     window.addEventListener("focus", checkWhenActive);
     window.addEventListener("pageshow", checkWhenActive);
@@ -204,14 +268,16 @@ export default function Home() {
     setTasks((current) => current.map((task) => (
       task.id === taskId
         ? (() => {
-            const reminderAt = getReminderTime(editDueDate, editDueTime);
+            const dueReminderAt = getReminderTime(editDueDate, editDueTime);
+            const previousDueReminderAt = getReminderTime(task.dueDate, task.dueTime);
+            const dueChanged = dueReminderAt !== previousDueReminderAt;
             return {
               ...task,
               title: cleanTitle,
               dueDate: editDueDate,
               dueTime: editDueDate ? editDueTime : "",
-              reminderAt,
-              notifiedAt: reminderAt === task.reminderAt ? task.notifiedAt : null,
+              reminderAt: dueChanged ? dueReminderAt : task.reminderAt,
+              notifiedAt: dueChanged ? null : task.notifiedAt,
               priority: editPriority,
             };
           })()
@@ -228,7 +294,7 @@ export default function Home() {
 
     const permission = await window.Notification.requestPermission();
     setNotificationPermission(permission);
-    if (permission === "granted") checkDueReminders();
+    if (permission === "granted") void checkDueReminders();
   }
 
   const reminderButtonText = notificationPermission === "granted"
@@ -441,7 +507,7 @@ export default function Home() {
           </>
         )}
       </section>
-      <footer>TaskBoard v0.3.0 | Saved on this device | No account needed</footer>
+      <footer>TaskBoard v0.3.1 | Saved on this device | No account needed</footer>
     </main>
   );
 }

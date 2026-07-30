@@ -34,3 +34,15 @@ export function markRemindersNotified<T extends ReminderTask>(
   ));
 }
 
+export function snoozeReminder<T extends ReminderTask>(
+  tasks: T[],
+  taskId: string,
+  snoozedUntil: number,
+) {
+  return tasks.map((task) => (
+    task.id === taskId
+      ? { ...task, reminderAt: snoozedUntil, notifiedAt: null }
+      : task
+  ));
+}
+
